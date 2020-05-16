@@ -37,3 +37,10 @@ python dataConverter.py <input relationship file> <output bgp-sas file>
 python graphGenerator.py <bgp-sas file> <output matrix market file>
 ```
 
+The resulting routing tree files are in the .npz format. They can be read as follows:
+```
+tree = np.load('routingTree.npz')
+tree['data']
+```
+
+The keys to the tree['data'] structure are ASNs and the values for an ASN,ASN pair is 1 if an edge is included in the routing tree.
