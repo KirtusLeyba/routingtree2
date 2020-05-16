@@ -15,15 +15,25 @@ The primary tool in BGP-SAS is the routing tree generator, which is designed to 
 
 ```
 #!/bin/bash
-#SBATCH -n 100
+#SBATCH -n <number of mpi ranks>
 #SBATCH -J routingTrees
 #SBATCH --mail-type=END,FAIL
-#SBATCH --mail-user=kleyba@asu.edu
-#SBATCH --time=72:00:00
+#SBATCH --mail-user=<your email>
+#SBATCH --time=<max wall time>
 
 module load openmpi/3.0.0-gnu-4.9.4
 
-mpirun -np 100 --map-by node --rank-by node -display-map python ./PythonCode/speedyGRT.py ./DataSets/20180101/20180101.as-rel.txtGraph.mtx v ./DataSets/20180101/routingTrees/ ./DataSets/20180101/20180101.as-rel.txt.bgp.nodeList 397206
+mpirun -np <number of mpi ranks> --map-by node --rank-by node -display-map \
+python speedyGRT.py <matrix market file> v \
+<output routing tree directory> <nodeList file> <max AS number>
 
 
 ```
+
+A matrix market file can be generated from a BGP edge relationship (such as those collected by CAIDA at https://www.caida.org/data/as-relationships/) file in the following procedure:
+
+```
+python dataConverter.py <input relationship file> <output bgp-sas file>
+python graphGenerator.py <bgp-sas file> <output matrix market file>
+```
+
