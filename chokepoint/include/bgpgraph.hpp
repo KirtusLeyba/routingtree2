@@ -30,11 +30,3 @@ class BGPNode {
 };
 
 std::unordered_map<std::string,BGPNode*> read_input_file(Options opt);
-
-void mod_bfs(std::unordered_map<std::string,BGPNode*> &G,
-			std::string source;
-			std::unordered_map<std::string, double> &ito_paths,
-			std::unordered_map<std::string, double> &ito_community_paths,
-			std::unordered_map<std::string, double> &oti_paths,
-			std::unordered_map<std::string, double> &oti_community_paths,
-			Options opt);
