@@ -5,20 +5,15 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <omp.h>
+#include "options.hpp"
 #include "bgpgraph.hpp"
 
 
 int main(int argc, char** argv) {
 
 	Options opt = parse_args(argc, argv);
-
-	printf("### BGPSAS ###\n");
-	printf("# input_file = %s\n", opt.input_file.c_str());
-	printf("# output_file = %s\n", opt.output_file.c_str());
-	printf("# border_mode = %s\n", opt.border_mode.c_str());
-	printf("# store_ncp = %d\n", opt.store_ncp);
-	if(opt.store_ncp) {
-		printf("# storing ncp at: ncp_%s\n", opt.output_file.c_str());
+	if(!check_args(opt)){
+		exit(0);
 	}
 
 	//load network from data
@@ -59,6 +54,14 @@ int main(int argc, char** argv) {
 	double t1 = omp_get_wtime();
 	printf("Finished Loading network in %f seconds...\n", t1-t0);
 
+	//run BFS
+	std::string source = "A";
+	std::unordered_map<std::string, int> path_counts = count_paths(full_network,source);
+
+	for(auto it : path_counts) {
+		printf("%s:%d\n",it.first.c_str(), it.second);
+		std::cout << std::flush;
+	}
 
 	//clear memory
 	printf("Cleaning memory...\n");

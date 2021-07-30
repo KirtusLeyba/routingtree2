@@ -1,26 +1,11 @@
 #include "bgpgraph.hpp"
 
-Options parse_args(int argc,char** argv) {
-
-	if(argc != 9){
-		printf("USAGE: ./chokepoint --inputfile <inputfile> --outputfile <outputfile> --bordermode <bordermode> --storencp <1=true,0=false>\n");
-		exit(0);
-	}
-
-	Options opt;
-	opt.input_file = argv[2];
-	opt.output_file = argv[4];
-	opt.border_mode = argv[6];
-	opt.store_ncp = atoi(argv[8]);
-	return opt;
-}
-
 BGPNode::BGPNode(std::string _asn, std::string _community_label) {
 	asn = _asn;
 	community_label = _community_label;
 }
 
-inline bool check_in(std::string a, std::unordered_map<std::string,BGPNode*> G){
+inline bool check_in(std::string a, std::unordered_map<std::string,BGPNode*> &G){
 	auto it = G.find(a);
 	if(it == G.end()){
 		return false;
@@ -78,4 +63,85 @@ std::unordered_map<std::string,BGPNode*> read_input_file(Options opt) {
 	fp.close();
 
 	return G;
+}
+
+void traverse_paths(std::string node,
+	std::unordered_map<std::string, std::vector<std::string>> &parents,
+	std::unordered_map<std::string, int> &path_counts){
+	if(parents.find(node) != parents.end()) {
+		for(unsigned int i = 0; i < parents[node].size(); i++) {
+			path_counts[node] += 1;
+			traverse_paths(parents[node][i], parents, path_counts);
+		}
+	} else {
+		path_counts[node] += 1;
+	}
+}
+
+std::unordered_map<std::string, int> count_paths(std::unordered_map<std::string, BGPNode*> &G,
+												std::string source) {
+
+	//for return value
+	std::unordered_map<std::string, int> path_counts;
+	if(!check_in(source, G)){
+		return path_counts;
+	}
+
+	// local variables for tracking BFS
+	std::unordered_map<std::string, std::vector<std::string>> parents;
+	std::unordered_map<std::string, int> distances;
+	std::unordered_set<std::string> visited;
+	std::queue<std::string> frontier;
+
+	//Set up the BFS starting from source
+	std::string current_node = source;
+	visited.insert(source);
+	// parents.insert( std::make_pair(source, std::vector<std::string>()) );
+	distances.insert( std::make_pair(source, 0) );
+	for(auto it : G[current_node]->neighbors) {
+		if(distances.find(it.first) != distances.end()) {
+			if(distances[it.first] == distances[current_node] + 1) {
+				parents[it.first].push_back(current_node);
+			}
+		} else {
+			distances.insert( std::make_pair(it.first, distances[current_node] + 1) );
+			parents.insert( std::make_pair(it.first, std::vector<std::string>()) );
+			parents[it.first].push_back(current_node);
+		}
+		auto in_visited = visited.find(it.first);
+		if(in_visited == visited.end()){
+			frontier.push(it.first);
+		}
+	}
+
+	//run BFS
+	while(!frontier.empty()) {
+		// fifo queue
+		current_node = frontier.front();
+		frontier.pop();
+		visited.insert(current_node);
+		for(auto it : G[current_node]->neighbors) {
+			if(distances.find(it.first) != distances.end()) {
+				if(distances[it.first] == distances[current_node] + 1) {
+					parents[it.first].push_back(current_node);
+				}
+			} else {
+				distances.insert( std::make_pair(it.first, distances[current_node] + 1) );
+				parents.insert( std::make_pair(it.first, std::vector<std::string>()) );
+				parents[it.first].push_back(current_node);
+			}
+			auto in_visited = visited.find(it.first);
+			if(in_visited == visited.end()){
+				frontier.push(it.first);
+			}
+		}
+	}
+
+	//iterate through found paths
+	for(auto it : parents) {
+		traverse_paths(it.first, parents, path_counts);
+	}
+
+	return path_counts;
+
 }

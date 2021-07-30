@@ -7,17 +7,7 @@
 #include <fstream>
 #include <sstream>
 #include <queue>
-
-//convenience struct
-//for holding command line args
-struct Options {
-	std::string input_file;
-	std::string output_file;
-	std::string border_mode;
-	int store_ncp;
-};
-
-Options parse_args(int argc,char** argv);
+#include "options.hpp"
 
 class BGPNode {
 	public:
@@ -30,3 +20,10 @@ class BGPNode {
 };
 
 std::unordered_map<std::string,BGPNode*> read_input_file(Options opt);
+
+std::unordered_map<std::string, int> count_paths(std::unordered_map<std::string, BGPNode*> &G,
+												std::string source);
+
+void traverse_paths(std::string node,
+	std::unordered_map<std::string, std::vector<std::string>> &parents,
+	std::unordered_map<std::string, int> &path_counts);
