@@ -74,25 +74,34 @@ std::unordered_map<std::string,BGPNode*> read_input_file(Options opt) {
 // in question
 void traverse_paths(std::string node,
 	std::unordered_map<std::string, std::vector<std::string>> &parents,
-	std::unordered_map<std::string, int> &path_counts){
+	std::unordered_map<std::string, double> &path_counts,
+	std::unordered_map<std::string, double> &path_cc_counts,
+	std::unordered_map<std::string, BGPNode*> &G){
 	if(parents.find(node) != parents.end()) {
 		for(unsigned int i = 0; i < parents[node].size(); i++) {
 			path_counts[node] += 1;
-			traverse_paths(parents[node][i], parents, path_counts);
+			traverse_paths(parents[node][i], parents, path_counts, path_cc_counts, G);
 		}
 	} else {
 		path_counts[node] += 1;
+		std::string cl = G[node]->community_label;
+		if(path_cc_counts.find(cl) == path_cc_counts.end()){
+			path_cc_counts[cl] = 1.0;
+		} else {
+			path_cc_counts[cl] += 1.0;
+		}
 	}
 }
 
 //standard BFS path counting
-std::unordered_map<std::string, int> count_paths(std::unordered_map<std::string, BGPNode*> &G,
+void count_paths(std::unordered_map<std::string, BGPNode*> &G,
+												std::unordered_map<std::string, double> &path_counts,
+												std::unordered_map<std::string, double> &path_cc_counts,
 												std::string source) {
 
 	//for return value
-	std::unordered_map<std::string, int> path_counts;
 	if(!check_in(source, G)){
-		return path_counts;
+		return;
 	}
 
 	// local variables for tracking BFS
@@ -147,23 +156,22 @@ std::unordered_map<std::string, int> count_paths(std::unordered_map<std::string,
 
 	//iterate through found paths
 	for(auto it : parents) {
-		traverse_paths(it.first, parents, path_counts);
+		traverse_paths(it.first, parents, path_counts, path_cc_counts, G);
 	}
-
-	return path_counts;
 
 }
 
 // BFS modified for BGP relationships
 // finds all equally good valley free paths
 // n*(c2p) + m*(p2p) * k(p2c) where n >= 0, m is 1 or 0, k is >= 0.
-std::unordered_map<std::string, int> count_paths_bgp(std::unordered_map<std::string, BGPNode*> &G,
+void count_paths_bgp(std::unordered_map<std::string, BGPNode*> &G,
+												std::unordered_map<std::string, double> &path_counts,
+												std::unordered_map<std::string, double> &path_cc_counts,
 												std::string source) {
 
 	//for return value
-	std::unordered_map<std::string, int> path_counts;
 	if(!check_in(source, G)){
-		return path_counts;
+		return;
 	}
 
 	// local variables for tracking BFS
@@ -287,9 +295,8 @@ std::unordered_map<std::string, int> count_paths_bgp(std::unordered_map<std::str
 
 	//iterate through found paths
 	for(auto it : parents) {
-		traverse_paths(it.first, parents, path_counts);
+		if(G[it.first]->community_label != G[source]->community_label) {
+			traverse_paths(it.first, parents, path_counts, path_cc_counts, G);
+		}
 	}
-
-	return path_counts;
-
 }
