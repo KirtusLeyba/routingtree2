@@ -24,6 +24,9 @@ std::unordered_map<std::string,BGPNode*> read_input_file(Options opt);
 std::unordered_map<std::string, int> count_paths(std::unordered_map<std::string, BGPNode*> &G,
 												std::string source);
 
+std::unordered_map<std::string, int> count_paths_bgp(std::unordered_map<std::string, BGPNode*> &G,
+													std::string source);
+
 void traverse_paths(std::string node,
 	std::unordered_map<std::string, std::vector<std::string>> &parents,
 	std::unordered_map<std::string, int> &path_counts);

@@ -1,10 +1,12 @@
 #include "bgpgraph.hpp"
 
+//instantiate BGPNode
 BGPNode::BGPNode(std::string _asn, std::string _community_label) {
 	asn = _asn;
 	community_label = _community_label;
 }
 
+//inline function for checking if a node is in a graph
 inline bool check_in(std::string a, std::unordered_map<std::string,BGPNode*> &G){
 	auto it = G.find(a);
 	if(it == G.end()){
@@ -13,6 +15,9 @@ inline bool check_in(std::string a, std::unordered_map<std::string,BGPNode*> &G)
 	return true;
 }
 
+//reads an input file of whitespace seperated values into a graph
+//file format:
+//asn_a asn_b rel community_label_a community_label_b
 std::unordered_map<std::string,BGPNode*> read_input_file(Options opt) {
 	std::unordered_map<std::string,BGPNode*> G;
 
@@ -65,6 +70,8 @@ std::unordered_map<std::string,BGPNode*> read_input_file(Options opt) {
 	return G;
 }
 
+// recursively travel up all paths and count how many are interecepted by the node
+// in question
 void traverse_paths(std::string node,
 	std::unordered_map<std::string, std::vector<std::string>> &parents,
 	std::unordered_map<std::string, int> &path_counts){
@@ -78,6 +85,7 @@ void traverse_paths(std::string node,
 	}
 }
 
+//standard BFS path counting
 std::unordered_map<std::string, int> count_paths(std::unordered_map<std::string, BGPNode*> &G,
 												std::string source) {
 
@@ -133,6 +141,146 @@ std::unordered_map<std::string, int> count_paths(std::unordered_map<std::string,
 			auto in_visited = visited.find(it.first);
 			if(in_visited == visited.end()){
 				frontier.push(it.first);
+			}
+		}
+	}
+
+	//iterate through found paths
+	for(auto it : parents) {
+		traverse_paths(it.first, parents, path_counts);
+	}
+
+	return path_counts;
+
+}
+
+// BFS modified for BGP relationships
+// finds all equally good valley free paths
+// n*(c2p) + m*(p2p) * k(p2c) where n >= 0, m is 1 or 0, k is >= 0.
+std::unordered_map<std::string, int> count_paths_bgp(std::unordered_map<std::string, BGPNode*> &G,
+												std::string source) {
+
+	//for return value
+	std::unordered_map<std::string, int> path_counts;
+	if(!check_in(source, G)){
+		return path_counts;
+	}
+
+	// local variables for tracking BFS
+	std::unordered_map<std::string, std::vector<std::string>> parents;
+	std::unordered_map<std::string, int> distances;
+	std::unordered_set<std::string> visited;
+	std::queue<std::string> frontier;
+
+	//Set up the BFS starting from source
+	std::string current_node = source;
+	visited.insert(source);
+	// parents.insert( std::make_pair(source, std::vector<std::string>()) );
+	distances.insert( std::make_pair(source, 0) );
+	for(auto it : G[current_node]->neighbors) {
+		if(it.second == "c2p") {
+			if(distances.find(it.first) != distances.end()) {
+				if(distances[it.first] == distances[current_node] + 1) {
+					parents[it.first].push_back(current_node);
+				}
+			} else {
+				distances.insert( std::make_pair(it.first, distances[current_node] + 1) );
+				parents.insert( std::make_pair(it.first, std::vector<std::string>()) );
+				parents[it.first].push_back(current_node);
+			}
+			auto in_visited = visited.find(it.first);
+			if(in_visited == visited.end()){
+				frontier.push(it.first);
+			}
+		}
+	}
+
+	//run BFS c2p stage
+	while(!frontier.empty()) {
+		// fifo queue
+		current_node = frontier.front();
+		frontier.pop();
+		visited.insert(current_node);
+		for(auto it : G[current_node]->neighbors) {
+			if(it.second == "c2p") {
+				if(distances.find(it.first) != distances.end()) {
+					if(distances[it.first] == distances[current_node] + 1) {
+						parents[it.first].push_back(current_node);
+					}
+				} else {
+					distances.insert( std::make_pair(it.first, distances[current_node] + 1) );
+					parents.insert( std::make_pair(it.first, std::vector<std::string>()) );
+					parents[it.first].push_back(current_node);
+				}
+				auto in_visited = visited.find(it.first);
+				if(in_visited == visited.end()){
+					frontier.push(it.first);
+				}
+			}
+		}
+	}
+
+	//run BFS p2p stage
+	for(auto it : visited) {
+		frontier.push(it);
+	}
+	while(!frontier.empty()) {
+		// fifo queue
+		current_node = frontier.front();
+		frontier.pop();
+		visited.insert(current_node);
+		for(auto it : G[current_node]->neighbors) {
+			if(it.second == "p2p") {
+				if(distances.find(it.first) != distances.end()) {
+					if(distances[it.first] == distances[current_node] + 1) {
+						parents[it.first].push_back(current_node);
+						visited.insert(it.first);
+					}
+					else if(distances[it.first] > distances[current_node] + 1) {
+						parents[it.first].clear();
+						parents[it.first].push_back(current_node);
+						distances[it.first] = distances[current_node] + 1;
+						visited.insert(it.first);
+					}
+				} else {
+					distances.insert( std::make_pair(it.first, distances[current_node] + 1) );
+					parents.insert( std::make_pair(it.first, std::vector<std::string>()) );
+					parents[it.first].push_back(current_node);
+					visited.insert(it.first);
+				}
+			}
+		}
+	}
+
+	//run BFS p2c stage
+	for(auto it : visited) {
+		frontier.push(it);
+	}
+	while(!frontier.empty()) {
+		// fifo queue
+		current_node = frontier.front();
+		frontier.pop();
+		visited.insert(current_node);
+		for(auto it : G[current_node]->neighbors) {
+			if(it.second == "p2c") {
+				if(distances.find(it.first) != distances.end()) {
+					if(distances[it.first] == distances[current_node] + 1) {
+						parents[it.first].push_back(current_node);
+					}
+					else if(distances[it.first] > distances[current_node] + 1) {
+						parents[it.first].clear();
+						parents[it.first].push_back(current_node);
+						distances[it.first] = distances[current_node] + 1;
+					}
+				} else {
+					distances.insert( std::make_pair(it.first, distances[current_node] + 1) );
+					parents.insert( std::make_pair(it.first, std::vector<std::string>()) );
+					parents[it.first].push_back(current_node);
+				}
+				auto in_visited = visited.find(it.first);
+				if(in_visited == visited.end()){
+					frontier.push(it.first);
+				}
 			}
 		}
 	}
